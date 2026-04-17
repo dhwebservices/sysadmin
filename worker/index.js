@@ -169,13 +169,15 @@ async function verifyMicrosoftJwt(token, env) {
   const header = JSON.parse(base64UrlDecode(encodedHeader))
   const payload = JSON.parse(base64UrlDecode(encodedPayload))
   const tenantId = String(env.ENTRA_TENANT_ID || '').toLowerCase()
+  const clientId = String(env.ENTRA_CLIENT_ID || '')
   const tokenTenantId = String(payload.tid || '').toLowerCase()
   const validIssuers = new Set([
     `https://login.microsoftonline.com/${tenantId}/v2.0`,
     `https://login.microsoftonline.com/${tenantId}/`,
     `https://sts.windows.net/${tenantId}/`,
   ])
-  if (payload.aud !== env.ENTRA_CLIENT_ID) throw new Error('Invalid token audience')
+  const validAudiences = new Set([clientId, `api://${clientId}`])
+  if (!validAudiences.has(String(payload.aud || ''))) throw new Error('Invalid token audience')
   if (!payload.iss || !validIssuers.has(payload.iss) || (tokenTenantId && tokenTenantId !== tenantId)) {
     throw new Error('Invalid token issuer')
   }
