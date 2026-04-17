@@ -168,9 +168,17 @@ async function verifyMicrosoftJwt(token, env) {
   if (!encodedHeader || !encodedPayload || !encodedSignature) throw new Error('Invalid token')
   const header = JSON.parse(base64UrlDecode(encodedHeader))
   const payload = JSON.parse(base64UrlDecode(encodedPayload))
-  const issuerPrefix = `https://login.microsoftonline.com/${env.ENTRA_TENANT_ID}/v2.0`
+  const tenantId = String(env.ENTRA_TENANT_ID || '').toLowerCase()
+  const tokenTenantId = String(payload.tid || '').toLowerCase()
+  const validIssuers = new Set([
+    `https://login.microsoftonline.com/${tenantId}/v2.0`,
+    `https://login.microsoftonline.com/${tenantId}/`,
+    `https://sts.windows.net/${tenantId}/`,
+  ])
   if (payload.aud !== env.ENTRA_CLIENT_ID) throw new Error('Invalid token audience')
-  if (!payload.iss || !payload.iss.startsWith(issuerPrefix)) throw new Error('Invalid token issuer')
+  if (!payload.iss || !validIssuers.has(payload.iss) || (tokenTenantId && tokenTenantId !== tenantId)) {
+    throw new Error('Invalid token issuer')
+  }
   if (!payload.exp || payload.exp * 1000 < Date.now()) throw new Error('Token expired')
 
   const keys = await getMicrosoftSigningKeys(env)
