@@ -1,8 +1,17 @@
+import { useEffect } from 'react'
 import { Shield } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/auth-context'
 
 export default function LoginPage() {
-  const { signIn, loading, error, isConfigured } = useAuth()
+  const navigate = useNavigate()
+  const { signIn, loading, error, isConfigured, viewer, account } = useAuth()
+
+  useEffect(() => {
+    if (viewer) {
+      navigate('/', { replace: true })
+    }
+  }, [navigate, viewer])
 
   return (
     <div className="login-shell">
@@ -29,6 +38,7 @@ export default function LoginPage() {
         <p>Use your DH admin Microsoft account. Browser access alone does not grant control actions.</p>
         {!isConfigured ? <div className="alert-card error">Entra environment values are missing.</div> : null}
         {error ? <div className="alert-card error">{error}</div> : null}
+        {account && loading ? <div className="alert-card">Finalising your admin session…</div> : null}
         <button type="button" className="primary-button" onClick={signIn} disabled={!isConfigured || loading}>
           Continue with Microsoft
         </button>
