@@ -4,6 +4,12 @@ import { acquireApiToken, createMsalConfig, loginRequest } from '../lib/msal'
 import { apiGet } from '../lib/api'
 import { AuthContext } from './auth-context'
 
+function isSafariBrowser() {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent
+  return /Safari/i.test(ua) && !/Chrome|Chromium|CriOS|Android/i.test(ua)
+}
+
 export function AuthProvider({ children }) {
   const [msalApp, setMsalApp] = useState(null)
   const [account, setAccount] = useState(null)
@@ -85,9 +91,29 @@ export function AuthProvider({ children }) {
       isConfigured: !!createMsalConfig(),
       signIn: async () => {
         if (!msalApp) return
-        const result = await msalApp.loginPopup(loginRequest)
-        msalApp.setActiveAccount(result.account)
-        setAccount(result.account)
+        if (isSafariBrowser()) {
+          await msalApp.loginRedirect(loginRequest)
+          return
+        }
+
+        const result = await msalApp.loginPopup(loginRequest).catch(async (error) => {
+          const message = String(error?.message || '')
+          if (
+            message.includes('popup_window_error') ||
+            message.includes('empty_window_error') ||
+            message.includes('monitor_window_timeout') ||
+            message.includes('user_cancelled')
+          ) {
+            throw error
+          }
+          await msalApp.loginRedirect(loginRequest)
+          return null
+        })
+
+        if (result?.account) {
+          msalApp.setActiveAccount(result.account)
+          setAccount(result.account)
+        }
       },
       signOut: async () => {
         if (!msalApp) return

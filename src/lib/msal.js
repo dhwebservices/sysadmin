@@ -12,7 +12,8 @@ export function createMsalConfig() {
     },
     cache: {
       cacheLocation: 'localStorage',
-      storeAuthStateInCookie: false,
+      temporaryCacheLocation: 'localStorage',
+      storeAuthStateInCookie: true,
     },
   }
 }
