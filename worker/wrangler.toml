@@ -1,4 +1,4 @@
-name = "dh-sysadmin-api"
+name = "sysadmin-api"
 main = "index.js"
 compatibility_date = "2026-04-17"
 
