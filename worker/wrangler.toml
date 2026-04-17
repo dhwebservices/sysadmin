@@ -1,0 +1,6 @@
+name = "dh-sysadmin-api"
+main = "index.js"
+compatibility_date = "2026-04-17"
+
+[triggers]
+crons = ["*/10 * * * *"]
