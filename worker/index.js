@@ -170,12 +170,13 @@ async function verifyMicrosoftJwt(token, env) {
   const payload = JSON.parse(base64UrlDecode(encodedPayload))
   const tenantId = String(env.ENTRA_TENANT_ID || '').toLowerCase()
   const tokenTenantId = String(payload.tid || '').toLowerCase()
+  const issuer = normalizeIssuer(payload.iss)
   const validIssuers = new Set([
-    `https://login.microsoftonline.com/${tenantId}/v2.0`,
-    `https://login.microsoftonline.com/${tenantId}/`,
-    `https://sts.windows.net/${tenantId}/`,
+    normalizeIssuer(`https://login.microsoftonline.com/${tenantId}/v2.0`),
+    normalizeIssuer(`https://login.microsoftonline.com/${tenantId}/`),
+    normalizeIssuer(`https://sts.windows.net/${tenantId}/`),
   ])
-  if (!payload.iss || !validIssuers.has(payload.iss) || (tokenTenantId && tokenTenantId !== tenantId)) {
+  if (!issuer || !validIssuers.has(issuer) || (tokenTenantId && tokenTenantId !== tenantId)) {
     throw new Error('Invalid token issuer')
   }
   if (!payload.exp || payload.exp * 1000 < Date.now()) throw new Error('Token expired')
@@ -223,6 +224,10 @@ function base64UrlDecode(value) {
 
 function base64UrlToUint8Array(value) {
   return Uint8Array.from(base64UrlDecode(value), (char) => char.charCodeAt(0))
+}
+
+function normalizeIssuer(value) {
+  return String(value || '').trim().toLowerCase().replace(/\/+$/, '')
 }
 
 async function ensureRegistrySeeded(env) {
