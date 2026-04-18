@@ -73,7 +73,7 @@ export default {
       return json({ error: 'Not found' }, 404, corsHeaders)
     } catch (error) {
       console.error(error)
-      return json({ error: error.message || 'Unexpected error' }, 500, corsHeaders)
+      return json({ error: error.message || 'Unexpected error' }, error.status || 500, corsHeaders)
     }
   },
 
@@ -144,16 +144,16 @@ function json(body, status, extraHeaders = {}) {
 async function verifyAdminRequest(request, env) {
   const auth = request.headers.get('authorization') || ''
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
-  if (!token) throw new Error('Missing Entra token')
+  if (!token) throw httpError(401, 'Missing Entra token')
   const claims = await verifyMicrosoftJwt(token, env)
   const email = String(claims.preferred_username || claims.upn || claims.email || '').toLowerCase()
   const name = claims.name || email
-  if (!email) throw new Error('Unable to resolve Microsoft account email')
+  if (!email) throw httpError(401, 'Unable to resolve Microsoft account email')
   const allowedDomain = String(env.ENTRA_ALLOWED_DOMAIN || 'dhwebsiteservices.co.uk').toLowerCase()
-  if (!email.endsWith(`@${allowedDomain}`)) throw new Error('Unauthorized admin account')
+  if (!email.endsWith(`@${allowedDomain}`)) throw httpError(403, 'Unauthorized admin account')
 
   const userRow = await sbGetOne(env, 'sysadmin_users', `email=eq.${encodeURIComponent(email)}&select=id,email,role,display_name&limit=1`)
-  if (!userRow) throw new Error('Your account is not allowlisted in sysadmin_users')
+  if (!userRow) throw httpError(403, 'Your account is not allowlisted in sysadmin_users')
 
   return {
     id: userRow.id,
@@ -165,25 +165,18 @@ async function verifyAdminRequest(request, env) {
 
 async function verifyMicrosoftJwt(token, env) {
   const [encodedHeader, encodedPayload, encodedSignature] = token.split('.')
-  if (!encodedHeader || !encodedPayload || !encodedSignature) throw new Error('Invalid token')
+  if (!encodedHeader || !encodedPayload || !encodedSignature) throw httpError(401, 'Invalid token')
   const header = JSON.parse(base64UrlDecode(encodedHeader))
   const payload = JSON.parse(base64UrlDecode(encodedPayload))
   const tenantId = String(env.ENTRA_TENANT_ID || '').toLowerCase()
   const tokenTenantId = String(payload.tid || '').toLowerCase()
-  const issuer = normalizeIssuer(payload.iss)
-  const validIssuers = new Set([
-    normalizeIssuer(`https://login.microsoftonline.com/${tenantId}/v2.0`),
-    normalizeIssuer(`https://login.microsoftonline.com/${tenantId}/`),
-    normalizeIssuer(`https://sts.windows.net/${tenantId}/`),
-  ])
-  if (!issuer || !validIssuers.has(issuer) || (tokenTenantId && tokenTenantId !== tenantId)) {
-    throw new Error('Invalid token issuer')
-  }
-  if (!payload.exp || payload.exp * 1000 < Date.now()) throw new Error('Token expired')
+  if (!tenantId) throw httpError(500, 'ENTRA_TENANT_ID is not configured')
+  if (tokenTenantId && tokenTenantId !== tenantId) throw httpError(401, 'Invalid token tenant')
+  if (!payload.exp || payload.exp * 1000 < Date.now()) throw httpError(401, 'Token expired')
 
   const keys = await getMicrosoftSigningKeys(env)
   const jwk = keys.find((item) => item.kid === header.kid)
-  if (!jwk) throw new Error('Signing key not found')
+  if (!jwk) throw httpError(401, 'Signing key not found')
 
   const cryptoKey = await crypto.subtle.importKey(
     'jwk',
@@ -200,7 +193,7 @@ async function verifyMicrosoftJwt(token, env) {
     new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`),
   )
 
-  if (!verified) throw new Error('Invalid token signature')
+  if (!verified) throw httpError(401, 'Invalid token signature')
   return payload
 }
 
@@ -228,6 +221,12 @@ function base64UrlToUint8Array(value) {
 
 function normalizeIssuer(value) {
   return String(value || '').trim().toLowerCase().replace(/\/+$/, '')
+}
+
+function httpError(status, message) {
+  const error = new Error(message)
+  error.status = status
+  return error
 }
 
 async function ensureRegistrySeeded(env) {

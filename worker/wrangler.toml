@@ -2,5 +2,12 @@ name = "sysadmin-api"
 main = "index.js"
 compatibility_date = "2026-04-17"
 
+[vars]
+CLOUDFLARE_ACCOUNT_ID = "b287cbf7f45d80db3dc9463657c838a7"
+ENTRA_ALLOWED_DOMAIN = "dhwebsiteservices.co.uk"
+ENTRA_CLIENT_ID = "d9872502-417d-4757-b8ae-384eeb44c4a7"
+ENTRA_TENANT_ID = "c8bd84c5-4ddb-4cb7-8276-0b7d30a42e5f"
+SUPABASE_URL = "https://xtunnfdwltfesscmpove.supabase.co"
+
 [triggers]
 crons = ["*/10 * * * *"]
